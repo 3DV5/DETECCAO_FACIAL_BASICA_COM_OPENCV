@@ -24,7 +24,7 @@ if faceCascade is None or faceCascade.empty():
         print(f" - {path}")
     print("\nSoluções possíveis:")
     print("1. Baixe o arquivo do GitHub do OpenCV:")
-    print("   https://github.com/opencv/opencv/tree/master/data/haarcascades")
+    print("   https://github.com/3DV5/DETECCAO_FACIAL_BASICA_COM_OPENCV/blob/main/haarcascade_frontalface_default.xml")
     print("2. Coloque-o na pasta do script ou em 'DETECCAO_FACIAL_BASICA_COM_OPENCV'")
     print("3. Instale o OpenCV completo: pip install opencv-contrib-python")
     exit()
