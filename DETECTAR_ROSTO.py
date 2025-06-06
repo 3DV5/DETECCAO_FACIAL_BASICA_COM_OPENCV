@@ -2,50 +2,70 @@ import numpy as np
 import cv2
 import os
 
-# Caminho corrigido para o classificador
-cascade_path = os.path.join('DETECCAO_FACIAL_BASICA_COM_OPENCV', 'haarcascade_frontalface_default.xml')
-faceCascade = cv2.CascadeClassifier(cascade_path)
+# Caminho alternativo e verificação de múltiplas localizações
+possible_paths = [
+    os.path.join('DETECCAO_FACIAL_BASICA_COM_OPENCV', 'haarcascade_frontalface_default.xml'),
+    'haarcascade_frontalface_default.xml',  # Na pasta atual
+    os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')  # Caminho padrão do OpenCV
+]
 
-# Verificar se o classificador foi carregado corretamente
-if faceCascade.empty():
-    print(f"Erro: Classificador não encontrado em {cascade_path}!")
-    print("Verifique se o caminho está correto e o arquivo existe.")
+faceCascade = None
+for cascade_path in possible_paths:
+    if os.path.isfile(cascade_path):
+        faceCascade = cv2.CascadeClassifier(cascade_path)
+        if not faceCascade.empty():
+            print(f"Classificador carregado de: {cascade_path}")
+            break
+
+# Se nenhum classificador foi encontrado
+if faceCascade is None or faceCascade.empty():
+    print("ERRO: Classificador não encontrado em nenhum dos locais:")
+    for path in possible_paths:
+        print(f" - {path}")
+    print("\nSoluções possíveis:")
+    print("1. Baixe o arquivo do GitHub do OpenCV:")
+    print("   https://github.com/opencv/opencv/tree/master/data/haarcascades")
+    print("2. Coloque-o na pasta do script ou em 'DETECCAO_FACIAL_BASICA_COM_OPENCV'")
+    print("3. Instale o OpenCV completo: pip install opencv-contrib-python")
     exit()
 
 # Inicializar câmera
 cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("ERRO: Não foi possível acessar a câmera!")
+    exit()
+
 cap.set(3, 640)  # Largura
 cap.set(4, 480)  # Altura
 
-# Configurações ajustáveis (experimente diferentes valores)
-SCALE_FACTOR = 1.05      # Reduzido para maior precisão
-MIN_NEIGHBORS = 6        # Aumentado para reduzir falsos positivos
-MIN_SIZE = (40, 40)      # Aumentado para ignorar objetos pequenos
-BRIGHTNESS_ADJ = 40      # Ajuste de brilho
-CONTRAST_ADJ = 1.2       # Ajuste de contraste
+# Configurações ajustáveis
+SCALE_FACTOR = 1.05
+MIN_NEIGHBORS = 6
+MIN_SIZE = (40, 40)
+BRIGHTNESS_ADJ = 40
+CONTRAST_ADJ = 1.2
 
-print("Pressione ESC para sair...")
-print("Dicas para melhor precisão:")
-print("- Garanta boa iluminação no ambiente")
-print("- Posicione o rosto a ~50cm da câmera")
-print("- Evite fundos muito complexos")
+print("\nDETECÇÃO FACIAL - CONTROLES:")
+print("ESC: Sair")
+print("+: Aumentar precisão")
+print("-: Aumentar velocidade")
+print("n: Reduzir falsos positivos")
+print("m: Aumentar sensibilidade")
 
 while True:
     ret, img = cap.read()
     if not ret:
-        print("Erro: Não foi possível capturar frame da câmera!")
+        print("Erro: Frame não capturado")
         break
         
-    # Rotação única de 180°
-    img = cv2.rotate(img, cv2.ROTATE_180)
     
-    # Pré-processamento para melhorar detecção
+    # Pré-processamento
     img = cv2.convertScaleAbs(img, alpha=CONTRAST_ADJ, beta=BRIGHTNESS_ADJ)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)  # Equalização de histograma
-    gray = cv2.GaussianBlur(gray, (5,5), 0)  # Redução de ruído
+    gray = cv2.equalizeHist(gray)
+    gray = cv2.GaussianBlur(gray, (5,5), 0)
     
-    # Detecção facial com parâmetros otimizados
+    # Detecção facial
     faces = faceCascade.detectMultiScale(
         gray,
         scaleFactor=SCALE_FACTOR,
@@ -54,43 +74,35 @@ while True:
         flags=cv2.CASCADE_SCALE_IMAGE
     )
 
-    # Desenhar retângulos e informações
+    # Desenhar resultados
     for (x, y, w, h) in faces:
-        # Retângulo principal
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        
-        # Marcador de centro
-        center_x = x + w//2
-        center_y = y + h//2
-        cv2.circle(img, (center_x, center_y), 5, (0, 0, 255), -1)
-        
-        # Exibir informações
-        face_percent = (w * h) / (img.shape[0] * img.shape[1]) * 100
-        cv2.putText(img, f"Face: {face_percent:.1f}%", (x, y-10), 
+        cv2.circle(img, (x + w//2, y + h//2), 5, (0, 0, 255), -1)
+        cv2.putText(img, f"Rosto", (x, y-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
-        cv2.putText(img, f"Pos: ({center_x},{center_y})", (x, y+h+20), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,200,0), 1)
 
-    # Adicionar informações gerais
-    cv2.putText(img, f"Faces Detectadas: {len(faces)}", (10, 30), 
+    # Informações na tela
+    cv2.putText(img, f"Faces: {len(faces)}", (10, 30), 
                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
-    cv2.putText(img, f"Config: SF={SCALE_FACTOR}, MN={MIN_NEIGHBORS}", (10, 60), 
+    cv2.putText(img, f"Config: SF={SCALE_FACTOR:.2f}, MN={MIN_NEIGHBORS}", (10, 60), 
                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200,200,0), 1)
+    cv2.putText(img, "Controles: + - n m", (10, 90), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200,100,255), 1)
     
-    cv2.imshow('Detecção Facial Aprimorada', img)
+    cv2.imshow('Detecção Facial', img)
 
-    # Teclas de controle
+    # Controles de teclado
     k = cv2.waitKey(30)
-    if k == 27:  # ESC para sair
+    if k == 27:  # ESC
         break
     elif k == ord('+') and SCALE_FACTOR > 1.01:
-        SCALE_FACTOR -= 0.01  # Aumentar precisão
+        SCALE_FACTOR -= 0.01
     elif k == ord('-') and SCALE_FACTOR < 1.5:
-        SCALE_FACTOR += 0.01  # Aumentar velocidade
+        SCALE_FACTOR += 0.01
     elif k == ord('n') and MIN_NEIGHBORS < 10:
-        MIN_NEIGHBORS += 1   # Reduzir falsos positivos
+        MIN_NEIGHBORS += 1
     elif k == ord('m') and MIN_NEIGHBORS > 1:
-        MIN_NEIGHBORS -= 1   # Aumentar sensibilidade
+        MIN_NEIGHBORS -= 1
 
 cap.release()
 cv2.destroyAllWindows()
